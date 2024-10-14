@@ -1,0 +1,228 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Крутой генератор отчетов 77</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: #f9f9f9;
+            margin: 0;
+            padding: 20px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+        }
+
+        #container {
+            background-color: #fff;
+            border-radius: 10px;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+            padding: 30px;
+            max-width: 800px;
+            width: 100%;
+        }
+
+        h1 {
+            font-size: 2em;
+            color: #333;
+            text-align: center;
+            margin-bottom: 20px;
+        }
+
+        textarea {
+            width: 100%;
+            height: 150px;
+            padding: 10px;
+            font-size: 16px;
+            border: 1px solid #ccc;
+            border-radius: 5px;
+            resize: vertical; 
+            min-height: 150px;
+        }
+
+        button {
+            display: inline-block;
+            margin-top: 15px;
+            background-color: #4CAF50;
+            color: white;
+            padding: 10px 20px;
+            font-size: 16px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            transition: background-color 0.3s;
+        }
+
+        button:hover {
+            background-color: #45a049;
+        }
+
+        #result {
+            margin-top: 30px;
+            background-color: #f1f1f1;
+            padding: 15px;
+            border-radius: 5px;
+            font-size: 16px;
+            line-height: 1.5;
+            color: #333;
+            white-space: pre-wrap;
+            max-height: 400px;
+            overflow-y: auto;
+            border: 1px solid #ccc;
+        }
+
+        @media (max-width: 600px) {
+            #container {
+                padding: 15px;
+            }
+
+            textarea {
+                font-size: 14px;
+            }
+
+            button {
+                width: 100%;
+                font-size: 14px;
+            }
+
+            h1 {
+                font-size: 1.5em;
+            }
+        }
+    </style>
+</head>
+<body>
+
+    <div id="container">
+        <h1>Парсер отчетов Telegram</h1>
+        <textarea id="input" placeholder="Вставьте сюда отчеты (каждый отчет с новой строки)"></textarea>
+        <button onclick="parseReports()">Обработать отчеты</button>
+        <div id="result"></div>
+    </div>
+
+    <script>
+        function parseReport(report) {
+            const result = {};
+            
+            
+            const nameMatch = report.match(/([А-Яа-яЁёA-Za-z]+)\s+(\d+)/);
+            if (nameMatch) {
+                result.name = nameMatch[1];
+                result.number = parseInt(nameMatch[2]);
+            }
+            
+            
+            const depositMatch = report.match(/Кол-во депозитов\s*:\s*(\d+)\s*\((\d+)\$\)/);
+            if (depositMatch) {
+                result.deposits = parseInt(depositMatch[1]);
+                result.depositSum = parseInt(depositMatch[2]);
+            }
+
+            
+            const workloadMatch = report.match(/Загруженность\s*:\s*(\d+(\.\d+)?)/);
+            if (workloadMatch) {
+                result.workload = parseFloat(workloadMatch[1]);
+            }
+
+           
+            const feedbackMatch = report.match(/1\.\s+(.*?)(?:\n|$)/);
+            if (feedbackMatch) {
+                result.feedback = feedbackMatch[1];
+            }
+
+           
+            const errorsMatch = report.match(/2\.\s+(.*?)(?:\n|$)/);
+            if (errorsMatch) {
+                result.errors = errorsMatch[1];
+            }
+
+       
+            const suggestionsMatch = report.match(/3\.\s+(.*?)(?:\n|$)/);
+            if (suggestionsMatch) {
+                result.suggestions = suggestionsMatch[1];
+            }
+
+            return result;
+        }
+
+        function processReports(reports) {
+            const totalResult = {
+                totalDepositSum: 0,
+                totalDeposits: 0,
+                totalWorkload: 0,
+                reports: []
+            };
+
+            reports.forEach(report => {
+                const parsedReport = parseReport(report);
+                
+            
+                totalResult.totalDepositSum += parsedReport.depositSum || 0;
+                totalResult.totalDeposits += parsedReport.deposits || 0;
+                totalResult.totalWorkload += parsedReport.workload || 0;
+
+                totalResult.reports.push(parsedReport);
+            });
+
+           
+            totalResult.averageWorkload = totalResult.totalWorkload / totalResult.reports.length;
+
+            return totalResult;
+        }
+
+        function formatResult(result) {
+            let output = `Общая касса: ${result.totalDepositSum}$\n`;
+            output += `Общее количество депозитов: ${result.totalDeposits}\n`;
+            output += `Средняя загруженность: ${result.averageWorkload.toFixed(2)}\n\n`;
+			
+            result.reports.forEach(report => {
+                output += `${report.name} ${report.number}\n`;
+                output += `Кол-во депозитов: ${report.deposits} (${report.depositSum}$)\n`;
+                output += `Загруженность: ${report.workload}\n\n`;
+            });			
+
+            // Описание общего дня
+            output += `1. Описание дня.\n\n`;
+
+            // Ошибки
+            output += `2. Ошибок не заметил\n\n`;
+
+            // Предложения
+            output += `3. Предложений нету\n\n`;
+
+            // Лучший и худший результат
+            let bestPlayer = result.reports[0];
+            let worstPlayer = result.reports[0];
+
+            result.reports.forEach(report => {
+                if (report.deposits > bestPlayer.deposits) {
+                    bestPlayer = report;
+                }
+                if (report.deposits < worstPlayer.deposits) {
+                    worstPlayer = report;
+                }
+            });
+
+            output += `4. Лучший результат - ${bestPlayer.name} ${bestPlayer.number}: ${bestPlayer.deposits} депозита (${bestPlayer.depositSum}$)\n`;
+            output += `${bestPlayer.name} работал активно, фокусируясь на качественной обработке лидов и взаимодействии с трафиком.\n\n`;
+
+            output += `5. Худший результат - ${worstPlayer.name} ${worstPlayer.number}: 0 депозита\n`;
+            output += `${worstPlayer.name} столкнулся с низкой активностью лидов и проблемами с привлечением трафика.\n\n`;
+
+
+            return output;
+        }
+
+        function parseReports() {
+            const input = document.getElementById('input').value;
+            const reports = input.split(/\n(?=[А-Яа-яЁёA-Za-z]+\s+\d+)/).filter(report => report.trim() !== '');
+            const result = processReports(reports);
+            const formattedResult = formatResult(result);
+            document.getElementById('result').textContent = formattedResult;
+        }
+    </script>
+</body>
+</html>
