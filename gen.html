@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Крутой генератор отчетов 77</title>
+    <title>Еьейший парсер 77</title>
     <style>
         body {
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
@@ -39,7 +39,7 @@
             font-size: 16px;
             border: 1px solid #ccc;
             border-radius: 5px;
-            resize: vertical; 
+            resize: vertical;
             min-height: 150px;
         }
 
@@ -95,7 +95,6 @@
     </style>
 </head>
 <body>
-
     <div id="container">
         <h1>Парсер отчетов Telegram</h1>
         <textarea id="input" placeholder="Вставьте сюда отчеты (каждый отчет с новой строки)"></textarea>
@@ -127,22 +126,22 @@
                 result.workload = parseFloat(workloadMatch[1]);
             }
 
-           
-            const feedbackMatch = report.match(/1\.\s+(.*?)(?:\n|$)/);
+            
+            const feedbackMatch = report.match(/1\.\s+(.*?)(?=\n2\.|$)/s);
             if (feedbackMatch) {
-                result.feedback = feedbackMatch[1];
+                result.feedback = feedbackMatch[1].trim();
+            }
+
+            
+            const errorsMatch = report.match(/2\.\s+(.*?)(?=\n3\.|$)/s);
+            if (errorsMatch) {
+                result.errors = errorsMatch[1].trim();
             }
 
            
-            const errorsMatch = report.match(/2\.\s+(.*?)(?:\n|$)/);
-            if (errorsMatch) {
-                result.errors = errorsMatch[1];
-            }
-
-       
-            const suggestionsMatch = report.match(/3\.\s+(.*?)(?:\n|$)/);
+            const suggestionsMatch = report.match(/3\.\s+(.*?)(?:\n|$)/s);
             if (suggestionsMatch) {
-                result.suggestions = suggestionsMatch[1];
+                result.suggestions = suggestionsMatch[1].trim();
             }
 
             return result;
@@ -159,7 +158,7 @@
             reports.forEach(report => {
                 const parsedReport = parseReport(report);
                 
-            
+                
                 totalResult.totalDepositSum += parsedReport.depositSum || 0;
                 totalResult.totalDeposits += parsedReport.deposits || 0;
                 totalResult.totalWorkload += parsedReport.workload || 0;
@@ -173,45 +172,110 @@
             return totalResult;
         }
 
+        function generateDaySummary(reports) {
+            
+            const feedbacks = reports
+                .map(report => report.feedback)
+                .filter(feedback => feedback && feedback.length > 0);
+
+         
+            const commonThemes = new Set();
+            
+          
+            const keywords = {
+                activity: ['актив', 'активность', 'трафик'],
+                leads: ['лид', 'клиент'],
+                problems: ['проблем', 'сложност', 'трудност'],
+                regions: ['регион', 'стран']
+            };
+
+            feedbacks.forEach(feedback => {
+             
+                if (keywords.activity.some(word => feedback.toLowerCase().includes(word))) {
+                    if (feedback.toLowerCase().includes('низк')) {
+                        commonThemes.add('низкая активность');
+                    } else if (feedback.toLowerCase().includes('высок')) {
+                        commonThemes.add('высокая активность');
+                    }
+                }
+
+                if (keywords.leads.some(word => feedback.toLowerCase().includes(word))) {
+                    if (feedback.toLowerCase().includes('качествен')) {
+                        commonThemes.add('качественные лиды');
+                    } else if (feedback.toLowerCase().includes('не заинтересован')) {
+                        commonThemes.add('незаинтересованные лиды');
+                    }
+                }
+
+             
+                const regionMatch = feedback.match(/из ([^,.]+)/);
+                if (regionMatch) {
+                    commonThemes.add(`лиды из ${regionMatch[1]}`);
+                }
+
+               
+                if (keywords.problems.some(word => feedback.toLowerCase().includes(word))) {
+                    const problemMatch = feedback.match(/(?:проблем|сложност|трудност)[^\.,]*[\.,]/i);
+                    if (problemMatch) {
+                        commonThemes.add(problemMatch[0].trim());
+                    }
+                }
+            });
+
+           
+            let summary = 'День характеризовался следующими особенностями:\n';
+            commonThemes.forEach(theme => {
+                summary += `- ${theme}\n`;
+            });
+
+            return summary;
+        }
+
         function formatResult(result) {
-            let output = `Общая касса: ${result.totalDepositSum}$\n`;
+            let output = `Общая сумма кассы: ${result.totalDepositSum}$\n`;
             output += `Общее количество депозитов: ${result.totalDeposits}\n`;
             output += `Средняя загруженность: ${result.averageWorkload.toFixed(2)}\n\n`;
-			
+            
+        
             result.reports.forEach(report => {
                 output += `${report.name} ${report.number}\n`;
                 output += `Кол-во депозитов: ${report.deposits} (${report.depositSum}$)\n`;
                 output += `Загруженность: ${report.workload}\n\n`;
-            });			
-
-            // Описание общего дня
-            output += `1. Описание дня.\n\n`;
-
-            // Ошибки
-            output += `2. Ошибок не заметил\n\n`;
-
-            // Предложения
-            output += `3. Предложений нету\n\n`;
-
-            // Лучший и худший результат
-            let bestPlayer = result.reports[0];
-            let worstPlayer = result.reports[0];
-
-            result.reports.forEach(report => {
-                if (report.deposits > bestPlayer.deposits) {
-                    bestPlayer = report;
-                }
-                if (report.deposits < worstPlayer.deposits) {
-                    worstPlayer = report;
-                }
             });
 
+         
+            output += `1. ${generateDaySummary(result.reports)}\n`;
+
+        
+            const allErrors = result.reports
+                .map(report => report.errors)
+                .filter(error => error && !error.toLowerCase().includes('нет') && error.length > 0);
+
+      
+            output += `2. ${allErrors.length > 0 ? allErrors.join('\n') : 'Ошибок не заметил'}\n\n`;
+
+   
+            const allSuggestions = result.reports
+                .map(report => report.suggestions)
+                .filter(suggestion => suggestion && !suggestion.toLowerCase().includes('нет') && suggestion.length > 0);
+
+
+            output += `3. ${allSuggestions.length > 0 ? allSuggestions.join('\n') : 'Предложений нету'}\n\n`;
+
+
+            let bestPlayer = result.reports.reduce((prev, current) => 
+                (current.deposits > prev.deposits) ? current : prev
+            );
+
+            let worstPlayer = result.reports.reduce((prev, current) => 
+                (current.deposits < prev.deposits) ? current : prev
+            );
+
             output += `4. Лучший результат - ${bestPlayer.name} ${bestPlayer.number}: ${bestPlayer.deposits} депозита (${bestPlayer.depositSum}$)\n`;
-            output += `${bestPlayer.name} работал активно, фокусируясь на качественной обработке лидов и взаимодействии с трафиком.\n\n`;
+            output += `${bestPlayer.feedback}\n\n`;
 
-            output += `5. Худший результат - ${worstPlayer.name} ${worstPlayer.number}: 0 депозита\n`;
-            output += `${worstPlayer.name} столкнулся с низкой активностью лидов и проблемами с привлечением трафика.\n\n`;
-
+            output += `5. Худший результат - ${worstPlayer.name} ${worstPlayer.number}: ${worstPlayer.deposits} депозита (${worstPlayer.depositSum}$)\n`;
+            output += `${worstPlayer.feedback}\n\n`;
 
             return output;
         }
