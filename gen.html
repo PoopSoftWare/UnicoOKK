@@ -3,26 +3,23 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Еьейший парсер 77</title>
+    <title>Ебейший парсер 77</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/3.7.0/chart.min.js"></script>
     <style>
         body {
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
             background-color: #f9f9f9;
             margin: 0;
             padding: 20px;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            min-height: 100vh;
         }
 
         #container {
+            max-width: 1200px;
+            margin: 0 auto;
             background-color: #fff;
             border-radius: 10px;
             box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
             padding: 30px;
-            max-width: 800px;
-            width: 100%;
         }
 
         h1 {
@@ -32,9 +29,19 @@
             margin-bottom: 20px;
         }
 
+        .input-section {
+            display: flex;
+            gap: 20px;
+            margin-bottom: 20px;
+        }
+
+        .controls {
+            flex: 1;
+        }
+
         textarea {
             width: 100%;
-            height: 150px;
+            height: 200px;
             padding: 10px;
             font-size: 16px;
             border: 1px solid #ccc;
@@ -43,25 +50,52 @@
             min-height: 150px;
         }
 
+        .button-group {
+            display: flex;
+            gap: 10px;
+            margin-top: 10px;
+        }
+
         button {
-            display: inline-block;
-            margin-top: 15px;
-            background-color: #4CAF50;
-            color: white;
             padding: 10px 20px;
             font-size: 16px;
             border: none;
             border-radius: 5px;
             cursor: pointer;
-            transition: background-color 0.3s;
+            transition: all 0.3s;
+        }
+
+        .primary-button {
+            background-color: #4CAF50;
+            color: white;
+        }
+
+        .secondary-button {
+            background-color: #607d8b;
+            color: white;
         }
 
         button:hover {
-            background-color: #45a049;
+            opacity: 0.9;
+            transform: translateY(-1px);
+        }
+
+        .results-section {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+            margin-top: 20px;
+        }
+
+        .stats-card {
+            background-color: #fff;
+            border-radius: 8px;
+            padding: 15px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
         }
 
         #result {
-            margin-top: 30px;
+            grid-column: 1 / -1;
             background-color: #f1f1f1;
             padding: 15px;
             border-radius: 5px;
@@ -74,22 +108,67 @@
             border: 1px solid #ccc;
         }
 
-        @media (max-width: 600px) {
-            #container {
-                padding: 15px;
+        .chart-container {
+            margin-top: 20px;
+            height: 300px;
+        }
+
+        .notification {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            padding: 15px;
+            border-radius: 5px;
+            color: white;
+            opacity: 0;
+            transition: opacity 0.3s;
+        }
+
+        .notification.success {
+            background-color: #4CAF50;
+        }
+
+        .notification.error {
+            background-color: #f44336;
+        }
+
+        .show {
+            opacity: 1;
+        }
+
+        .metrics-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+            margin-bottom: 20px;
+        }
+
+        .metric-card {
+            background: #fff;
+            padding: 15px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            text-align: center;
+        }
+
+        .metric-value {
+            font-size: 24px;
+            font-weight: bold;
+            color: #4CAF50;
+        }
+
+        .metric-label {
+            color: #666;
+            font-size: 14px;
+        }
+
+        @media (max-width: 768px) {
+            .results-section {
+                grid-template-columns: 1fr;
             }
 
-            textarea {
-                font-size: 14px;
-            }
-
-            button {
-                width: 100%;
-                font-size: 14px;
-            }
-
-            h1 {
-                font-size: 1.5em;
+            .input-section {
+                flex-direction: column;
             }
         }
     </style>
@@ -97,36 +176,59 @@
 <body>
     <div id="container">
         <h1>Парсер отчетов Telegram</h1>
-        <textarea id="input" placeholder="Вставьте сюда отчеты (каждый отчет с новой строки)"></textarea>
-        <button onclick="parseReports()">Обработать отчеты</button>
-        <div id="result"></div>
+        
+        <div class="input-section">
+            <div class="controls">
+                <textarea id="input" placeholder="Вставьте сюда отчеты (каждый отчет с новой строки)"></textarea>
+                <div class="button-group">
+                    <button onclick="parseReports()" class="primary-button">Обработать</button>
+                    <button onclick="clearForm()" class="secondary-button">Очистить</button>
+                    <button onclick="saveReport()" class="secondary-button">Сохранить отчет</button>
+                </div>
+            </div>
+        </div>
+
+        <div id="metrics" class="metrics-grid"></div>
+        
+        <div class="results-section">
+            <div class="stats-card">
+                <canvas id="depositsChart"></canvas>
+            </div>
+            <div class="stats-card">
+                <canvas id="workloadChart"></canvas>
+            </div>
+            <div id="result"></div>
+        </div>
     </div>
 
+    <div id="notification" class="notification"></div>
+
     <script>
+
         function parseReport(report) {
             const result = {};
             
-            
+           
             const nameMatch = report.match(/([А-Яа-яЁёA-Za-z]+)\s+(\d+)/);
             if (nameMatch) {
                 result.name = nameMatch[1];
                 result.number = parseInt(nameMatch[2]);
             }
             
-            
+        
             const depositMatch = report.match(/Кол-во депозитов\s*:\s*(\d+)\s*\((\d+)\$\)/);
             if (depositMatch) {
                 result.deposits = parseInt(depositMatch[1]);
                 result.depositSum = parseInt(depositMatch[2]);
             }
 
-            
+           
             const workloadMatch = report.match(/Загруженность\s*:\s*(\d+(\.\d+)?)/);
             if (workloadMatch) {
                 result.workload = parseFloat(workloadMatch[1]);
             }
 
-            
+           
             const feedbackMatch = report.match(/1\.\s+(.*?)(?=\n2\.|$)/s);
             if (feedbackMatch) {
                 result.feedback = feedbackMatch[1].trim();
@@ -138,7 +240,7 @@
                 result.errors = errorsMatch[1].trim();
             }
 
-           
+            
             const suggestionsMatch = report.match(/3\.\s+(.*?)(?:\n|$)/s);
             if (suggestionsMatch) {
                 result.suggestions = suggestionsMatch[1].trim();
@@ -166,22 +268,22 @@
                 totalResult.reports.push(parsedReport);
             });
 
-           
+            
             totalResult.averageWorkload = totalResult.totalWorkload / totalResult.reports.length;
 
             return totalResult;
         }
 
         function generateDaySummary(reports) {
-            
+           
             const feedbacks = reports
                 .map(report => report.feedback)
                 .filter(feedback => feedback && feedback.length > 0);
 
-         
+           
             const commonThemes = new Set();
             
-          
+            
             const keywords = {
                 activity: ['актив', 'активность', 'трафик'],
                 leads: ['лид', 'клиент'],
@@ -190,7 +292,7 @@
             };
 
             feedbacks.forEach(feedback => {
-             
+                
                 if (keywords.activity.some(word => feedback.toLowerCase().includes(word))) {
                     if (feedback.toLowerCase().includes('низк')) {
                         commonThemes.add('низкая активность');
@@ -207,13 +309,13 @@
                     }
                 }
 
-             
+                
                 const regionMatch = feedback.match(/из ([^,.]+)/);
                 if (regionMatch) {
                     commonThemes.add(`лиды из ${regionMatch[1]}`);
                 }
 
-               
+                
                 if (keywords.problems.some(word => feedback.toLowerCase().includes(word))) {
                     const problemMatch = feedback.match(/(?:проблем|сложност|трудност)[^\.,]*[\.,]/i);
                     if (problemMatch) {
@@ -222,7 +324,7 @@
                 }
             });
 
-           
+       
             let summary = 'День характеризовался следующими особенностями:\n';
             commonThemes.forEach(theme => {
                 summary += `- ${theme}\n`;
@@ -236,33 +338,33 @@
             output += `Общее количество депозитов: ${result.totalDeposits}\n`;
             output += `Средняя загруженность: ${result.averageWorkload.toFixed(2)}\n\n`;
             
-        
+          
             result.reports.forEach(report => {
                 output += `${report.name} ${report.number}\n`;
                 output += `Кол-во депозитов: ${report.deposits} (${report.depositSum}$)\n`;
                 output += `Загруженность: ${report.workload}\n\n`;
             });
 
-         
+        
             output += `1. ${generateDaySummary(result.reports)}\n`;
 
-        
+            
             const allErrors = result.reports
                 .map(report => report.errors)
                 .filter(error => error && !error.toLowerCase().includes('нет') && error.length > 0);
 
-      
+            
             output += `2. ${allErrors.length > 0 ? allErrors.join('\n') : 'Ошибок не заметил'}\n\n`;
 
-   
+            
             const allSuggestions = result.reports
                 .map(report => report.suggestions)
                 .filter(suggestion => suggestion && !suggestion.toLowerCase().includes('нет') && suggestion.length > 0);
 
-
+         
             output += `3. ${allSuggestions.length > 0 ? allSuggestions.join('\n') : 'Предложений нету'}\n\n`;
 
-
+            // Определение лучшего и худшего результата
             let bestPlayer = result.reports.reduce((prev, current) => 
                 (current.deposits > prev.deposits) ? current : prev
             );
@@ -271,6 +373,7 @@
                 (current.deposits < prev.deposits) ? current : prev
             );
 
+            
             output += `4. Лучший результат - ${bestPlayer.name} ${bestPlayer.number}: ${bestPlayer.deposits} депозита (${bestPlayer.depositSum}$)\n`;
             output += `${bestPlayer.feedback}\n\n`;
 
@@ -287,6 +390,140 @@
             const formattedResult = formatResult(result);
             document.getElementById('result').textContent = formattedResult;
         }
+		
+		function showNotification(message, type = 'success') {
+            const notification = document.getElementById('notification');
+            notification.textContent = message;
+            notification.className = `notification ${type} show`;
+            setTimeout(() => {
+                notification.className = 'notification';
+            }, 3000);
+        }
+
+        function clearForm() {
+            document.getElementById('input').value = '';
+            document.getElementById('result').textContent = '';
+            document.getElementById('metrics').innerHTML = '';
+            clearCharts();
+            showNotification('Форма очищена');
+        }
+
+        function saveReport() {
+            const result = document.getElementById('result').textContent;
+            if (!result) {
+                showNotification('Нет данных для сохранения', 'error');
+                return;
+            }
+
+            const blob = new Blob([result], { type: 'text/plain' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `report_${new Date().toISOString().split('T')[0]}.txt`;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+            showNotification('Отчет сохранен');
+        }
+
+        function updateMetrics(result) {
+            const metrics = document.getElementById('metrics');
+            metrics.innerHTML = `
+                <div class="metric-card">
+                    <div class="metric-value">${result.totalDepositSum}$</div>
+                    <div class="metric-label">Общая сумма</div>
+                </div>
+                <div class="metric-card">
+                    <div class="metric-value">${result.totalDeposits}</div>
+                    <div class="metric-label">Всего депозитов</div>
+                </div>
+                <div class="metric-card">
+                    <div class="metric-value">${result.averageWorkload.toFixed(2)}</div>
+                    <div class="metric-label">Средняя загруженность</div>
+                </div>
+                <div class="metric-card">
+                    <div class="metric-value">${result.reports.length}</div>
+                    <div class="metric-label">Количество менеджеров</div>
+                </div>
+            `;
+        }
+
+        function updateCharts(result) {
+            const depositsCtx = document.getElementById('depositsChart').getContext('2d');
+            const workloadCtx = document.getElementById('workloadChart').getContext('2d');
+
+            new Chart(depositsCtx, {
+                type: 'bar',
+                data: {
+                    labels: result.reports.map(r => `${r.name} ${r.number}`),
+                    datasets: [{
+                        label: 'Количество депозитов',
+                        data: result.reports.map(r => r.deposits),
+                        backgroundColor: '#4CAF50'
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false
+                }
+            });
+
+            new Chart(workloadCtx, {
+                type: 'line',
+                data: {
+                    labels: result.reports.map(r => `${r.name} ${r.number}`),
+                    datasets: [{
+                        label: 'Загруженность',
+                        data: result.reports.map(r => r.workload),
+                        borderColor: '#2196F3',
+                        tension: 0.1
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false
+                }
+            });
+        }
+
+        function clearCharts() {
+            const charts = document.querySelectorAll('canvas');
+            charts.forEach(canvas => {
+                const ctx = canvas.getContext('2d');
+                ctx.clearRect(0, 0, canvas.width, canvas.height);
+            });
+        }
+
+        
+        function parseReports() {
+            try {
+                const input = document.getElementById('input').value;
+                if (!input.trim()) {
+                    showNotification('Введите данные для анализа', 'error');
+                    return;
+                }
+
+                const reports = input.split(/\n(?=[А-Яа-яЁёA-Za-z]+\s+\d+)/).filter(report => report.trim() !== '');
+                const result = processReports(reports);
+                const formattedResult = formatResult(result);
+                
+                document.getElementById('result').textContent = formattedResult;
+                updateMetrics(result);
+                updateCharts(result);
+                showNotification('Отчеты успешно обработаны');
+            } catch (error) {
+                console.error(error);
+                showNotification('Ошибка при обработке отчетов', 'error');
+            }
+        }
+
+    
+        document.addEventListener('keydown', function(e) {
+            if (e.ctrlKey && e.key === 'Enter') {
+                parseReports();
+            }
+        });
     </script>
 </body>
 </html>
